@@ -53,6 +53,8 @@ def route_messages():
     #TODO maybe remove fictitious 555 numbers?
     #http://en.wikipedia.org/wiki/555_(telephone_number)
 
+    #TODO quote protect the message... Not really at risk here but if we change our mind.
+
     return messages.route.respond_post(json['message'], json['recipients'])
 
 if __name__ == '__main__':
