@@ -4,7 +4,7 @@ import sys
 
 #TODO do that better?
 scriptpath = os.path.dirname(os.path.realpath(__file__))
-sys.path.append(os.path.join(scriptpath, "..", "src"))
+sys.path.append(os.path.join(scriptpath, "..", "src", "lib"))
 
 import router
 
