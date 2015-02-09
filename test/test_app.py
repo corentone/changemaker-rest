@@ -24,6 +24,7 @@ import requests
 import json
 import subprocess
 import pprint
+import argparse
 
 HOST = 'http://127.0.0.1:5000'
 #In order to run with CURL, we generate a script with the requests
@@ -52,12 +53,12 @@ class TestMessagesRouteEndpoint(unittest.TestCase):
         if self.curlfile:
             self.curlfile.close()
 
-    def helper_curlway_post(self, payload, run=False):
+    def helper_curlway_post(self, payload, run=False, content_type="application/json"):
         json_payload = json.dumps(payload)
 
         # Curl is not as good as requests :)
         # If you really need curl, Here is a command to copy/paste
-        cmd = ('curl -g -X POST -H "Content-Type: application/json" '
+        cmd = ('curl -g -X POST -H "Content-Type: '+content_type+'" '
                 '-d \''+ json_payload + '\' ' + self.url
             )
 
@@ -105,7 +106,6 @@ class TestMessagesRouteEndpoint(unittest.TestCase):
         self.assertEqual(expected_json, r.json())
 
         self.helper_curlway_post(payload)
-
         # 5k!
         payload = {
             'message': 'Hello World',
@@ -118,15 +118,231 @@ class TestMessagesRouteEndpoint(unittest.TestCase):
         self.assertEqual('application/json', r.headers['Content-Type'])
 
         #Not running assertEqual since expected is going to be hella long.
-        # can use the curl :)
+        # can use the curl to proofcheck :)
         self.helper_curlway_post(payload, run=True)
 
+
     def test_post_format_errors(self):
-        pass
+        # Content-type is not json
+        payload = {
+            'message': 'Hello World',
+            'recipients': [str(2134051000 + x) for x in range(2)]
+            }
+        headers = {'content-type': 'application/xml'}
+
+        r = requests.post(self.url, data=json.dumps(payload), headers=headers)
+        self.assertEqual(400, r.status_code)
+        self.assertEqual('application/json', r.headers['Content-Type'])
+
+        expected_error = {
+            'see_also': 'http://developers.domain.tld/doc/api/',
+            'message': "None is not of type 'object'",
+            'error': "Bad Request"}
+
+        self.assertEqual(expected_error, r.json())
+        self.helper_curlway_post(payload, content_type='application_xml')
+
+        #Content is empty
+        payload = {}
+        headers = {'content-type': 'application/json'}
+
+        r = requests.post(self.url, data=json.dumps(payload), headers=headers)
+        self.assertEqual(400, r.status_code)
+        self.assertEqual('application/json', r.headers['Content-Type'])
+
+        expected_error = {
+            'see_also': 'http://developers.domain.tld/doc/api/',
+            'message': "'message' is a required property",
+            'error': "Bad Request"}
+
+        self.assertEqual(expected_error, r.json())
+        self.helper_curlway_post(payload)
+
+        #message is wrong type
+        payload = {
+            'message' : 12,
+            'recipients': [str(2134051000 + x) for x in range(2)]
+            }
+        headers = {'content-type': 'application/json'}
+
+        r = requests.post(self.url, data=json.dumps(payload), headers=headers)
+        self.assertEqual(400, r.status_code)
+        self.assertEqual('application/json', r.headers['Content-Type'])
+
+        expected_error = {
+            'see_also': 'http://developers.domain.tld/doc/api/',
+            'message': "12 is not of type 'string'",
+            'error': "Bad Request"}
+
+        self.assertEqual(expected_error, r.json())
+        self.helper_curlway_post(payload)
+
+        #recipients is empty
+        payload = {
+            'message' : "12",
+            'recipients': []
+            }
+        headers = {'content-type': 'application/json'}
+
+        r = requests.post(self.url, data=json.dumps(payload), headers=headers)
+        self.assertEqual(400, r.status_code)
+        self.assertEqual('application/json', r.headers['Content-Type'])
+
+        expected_error = {
+            'see_also': 'http://developers.domain.tld/doc/api/',
+            'message': "[] is too short",
+            'error': "Bad Request"}
+
+        self.assertEqual(expected_error, r.json())
+        self.helper_curlway_post(payload)
+
+        #not parseable json
+        headers = {'content-type': 'application/json'}
+
+        r = requests.post(self.url, data="Data", headers=headers)
+        self.assertEqual(400, r.status_code)
+        self.assertEqual('application/json', r.headers['Content-Type'])
+
+        expected_error = {
+            'see_also': 'http://developers.domain.tld/doc/api/',
+            'message': "Invalid JSON Request.",
+            'error': "Bad Request"}
+
+        self.assertEqual(expected_error, r.json())
+        self.helper_curlway_post(payload)
+
+        #Extra parameter
+        payload = {
+            'message' : "12",
+            'other_message' : "12",
+            'recipients': [str(2134051000 + x) for x in range(20)]
+            }
+        headers = {'content-type': 'application/json'}
+
+        r = requests.post(self.url, data=json.dumps(payload), headers=headers)
+        self.assertEqual(400, r.status_code)
+        self.assertEqual('application/json', r.headers['Content-Type'])
+
+        expected_error = {
+            'see_also': 'http://developers.domain.tld/doc/api/',
+            'message': "Additional properties are not allowed (u'other_message' was unexpected)",
+            'error': "Bad Request"}
+
+        self.assertEqual(expected_error, r.json())
+        self.helper_curlway_post(payload)
 
     def test_post_content_errors(self):
-        pass
+        #recipients is too full
+        payload = {
+            'message' : "12",
+            'recipients': [str(2134051000 + x) for x in range(5001)]
+            }
+        headers = {'content-type': 'application/json'}
+
+        r = requests.post(self.url, data=json.dumps(payload), headers=headers)
+        self.assertEqual(400, r.status_code)
+        self.assertEqual('application/json', r.headers['Content-Type'])
+
+        expected_error = {
+            'see_also': 'http://developers.domain.tld/doc/api/',
+            'message': "'recipients' array is too long.",
+            'error': "Bad Request"}
+
+        self.assertEqual(expected_error, r.json())
+        self.helper_curlway_post(payload)
+
+        #One number is wrong:
+        payload = {
+            'message' : "12",
+            'recipients': ["222"]
+            }
+        headers = {'content-type': 'application/json'}
+
+        r = requests.post(self.url, data=json.dumps(payload), headers=headers)
+        self.assertEqual(400, r.status_code)
+        self.assertEqual('application/json', r.headers['Content-Type'])
+
+        expected_error = {
+            'see_also': 'http://developers.domain.tld/doc/api/',
+            'message': "Invalid value: '222'. Must respect pattern '^(\\+1 ?)?\\(?([2-9][0-9]{2})\\)?[-. ]?([0-9]{3})[-. ]?([0-9]{4})$'",
+            'error': "Bad Request"}
+
+        self.assertEqual(expected_error, r.json())
+        self.helper_curlway_post(payload)
+
+        #multiple numbers are wrong (only report the first.):
+        payload = {
+            'message' : "12",
+            'recipients': ["222", "333"]
+            }
+        headers = {'content-type': 'application/json'}
+
+        r = requests.post(self.url, data=json.dumps(payload), headers=headers)
+        self.assertEqual(400, r.status_code)
+        self.assertEqual('application/json', r.headers['Content-Type'])
+
+        expected_error = {
+            'see_also': 'http://developers.domain.tld/doc/api/',
+            'message': "Invalid value: '222'. Must respect pattern '^(\\+1 ?)?\\(?([2-9][0-9]{2})\\)?[-. ]?([0-9]{3})[-. ]?([0-9]{4})$'",
+            'error': "Bad Request"}
+
+        self.assertEqual(expected_error, r.json())
+        self.helper_curlway_post(payload)
+
+        #Twice the same number:
+        payload = {
+            'message' : "12",
+            'recipients': ["2134445654", "2134445654"]
+            }
+        headers = {'content-type': 'application/json'}
+
+        r = requests.post(self.url, data=json.dumps(payload), headers=headers)
+        self.assertEqual(400, r.status_code)
+        self.assertEqual('application/json', r.headers['Content-Type'])
+
+        expected_error = {
+            'see_also': 'http://developers.domain.tld/doc/api/',
+            'message': "Values of 'recipients' must be unique",
+            'error': "Bad Request"}
+
+        self.assertEqual(expected_error, r.json())
+        self.helper_curlway_post(payload)
+
+        #Twice the same number (in different format):
+        payload = {
+            'message' : "12",
+            'recipients': ["(213)444-5654", "2134445654"]
+            }
+        headers = {'content-type': 'application/json'}
+
+        r = requests.post(self.url, data=json.dumps(payload), headers=headers)
+        self.assertEqual(400, r.status_code)
+        self.assertEqual('application/json', r.headers['Content-Type'])
+
+        expected_error = {
+            'see_also': 'http://developers.domain.tld/doc/api/',
+            'message': "Values of 'recipients' must be unique",
+            'error': "Bad Request"}
+
+        self.assertEqual(expected_error, r.json())
+        self.helper_curlway_post(payload)
 
 if __name__ == '__main__':
     #TODO use nosetests?
-    unittest.main()
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--host', action='store', default=None)
+    parser.add_argument('--curlfile', action='store', default=None)
+    parser.add_argument('ut_args', metavar='test', nargs="*", help="unittest default args")
+    args = parser.parse_args()
+
+    ut_argv = [sys.argv[0]]
+
+    if args.host:
+        HOST = args.host
+
+    if args.curlfile:
+        CURL_FILE = args.curlfile
+
+    ut_argv = ut_argv + args.ut_args
+
+    unittest.main(argv=ut_argv)

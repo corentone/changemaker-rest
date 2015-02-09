@@ -13,7 +13,9 @@ class BadRequest(Exception):
         self.message = message
         self.see_also = see_also
     def to_response(self):
-        error = {'message': self.message }
+        error = {
+            'error': "Bad Request",
+            'message': self.message }
         if self.see_also:
             error['see_also'] = self.see_also
 
@@ -35,6 +37,9 @@ app.request_class = customRequest
 def on_validation_error(e):
     # Raising badRequest here doesnt seem to work as we got out of the try catch
     # already? I guess we just cant raise exceptions from here.
+
+    #TODO make the error more than just e.message... We could also give the context
+
     return BadRequest(e.message).to_response()
 
 @app.errorhandler(BadRequest)
@@ -45,10 +50,12 @@ def handlerBadRequest(e):
 def route_messages():
     json = request.get_json() #A non-valid JSON would trigger a 400 auto formatted by flask.
 
-    if json == False:
-        raise BadRequest("Request was empty")
-
     validate(json, messages.route.schema)
+
+    try:
+        messages.route.check_phones(json['recipients'])
+    except messages.route.InvalidPhone as e:
+        raise BadRequest(e.message)
 
     #TODO maybe remove fictitious 555 numbers?
     #http://en.wikipedia.org/wiki/555_(telephone_number)
