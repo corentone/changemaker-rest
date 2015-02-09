@@ -1,0 +1,20 @@
+To start the app:
+  python src/app.py
+
+To run the APP UT:
+  python test/test_app.py
+
+This test generates curl.sh, which can be run:
+  bash curl.sh
+
+To test the routing mechanism:
+  python test/test_router.py
+
+
+
+
+The app is currently deployed on Heroku, to test:
+
+python test/test_app.py --host https://rocky-forest-8535.herokuapp.com
+
+There is an extra "GET /" which allows verifying that the app is up.
