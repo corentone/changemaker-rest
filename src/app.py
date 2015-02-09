@@ -1,4 +1,5 @@
 import os
+import argparse
 
 from flask import Flask, request, jsonify, Request
 from jsonschema import ValidationError, validate
@@ -6,7 +7,6 @@ from jsonschema import ValidationError, validate
 import messages.route
 
 app = Flask(__name__)
-app.debug = True
 
 class BadRequest(Exception):
     def __init__(self, message, see_also="http://developers.domain.tld/doc/api/"):
@@ -64,5 +64,22 @@ def route_messages():
 
     return messages.route.respond_post(json['message'], json['recipients'])
 
+@app.route('/', methods=['GET'])
+def route_root():
+    return "Hello World"
+
+
+def parse():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--host', dest='host', action='store', default="127.0.0.1")
+    parser.add_argument('-d','--debug', dest='debug', action='store_true', default=False)
+    parser.add_argument('-p','--port', dest='port', action='store', type=int, default=5000)
+    return parser.parse_args()
+
 if __name__ == '__main__':
-    app.run()
+    args = parse()
+
+    app.debug = args.debug
+
+    #TODO plug into WSGI? Apache?
+    app.run(host=args.host, port=args.port )
